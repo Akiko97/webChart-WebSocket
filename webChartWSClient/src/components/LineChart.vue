@@ -4,6 +4,7 @@ const props = defineProps<{ url: string }>()
 import {ref} from 'vue'
 import {CategoryScale, Chart as ChartJS, Legend, LinearScale, LineElement, PointElement, Title, Tooltip} from 'chart.js'
 import {Line} from 'vue-chartjs'
+import { ElMessage } from 'element-plus'
 
 ChartJS.register(
     CategoryScale,
@@ -40,11 +41,11 @@ const options = {
 
 const data_no = ref(0)
 
-const connectWebSocket = () => {
+const connectWebSocket = (reconnectDelay = 5000) => {
   const ws = new WebSocket(props.url)
 
   ws.onmessage = (event) => {
-    const num: number = event.data
+    const num = parseInt(event.data)
     data.value = {
       labels: [...data.value.labels, `Data${data_no.value++}`],
       datasets: [
@@ -54,6 +55,28 @@ const connectWebSocket = () => {
         }
       ]
     }
+  }
+
+  ws.onopen = () => {
+    ElMessage({
+      message: 'WebSocket connection established.',
+      type: 'success',
+    })
+  }
+
+  ws.onclose = (event) => {
+    console.error('Websocket reconnect: ', event)
+    ElMessage({
+      message: 'WebSocket connection closed. Reconnecting...',
+      type: 'warning',
+    })
+    setTimeout(() => connectWebSocket(reconnectDelay), reconnectDelay)
+  }
+
+  ws.onerror = (error) => {
+    console.error('WebSocket error:', error)
+    ElMessage.error('Oops, WebSocket error...')
+    ws.close()
   }
 }
 const connect = () => {
